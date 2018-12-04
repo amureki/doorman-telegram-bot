@@ -14,4 +14,8 @@ A simple anti-bot bot for Telegram groups.
 
 # Solutions
 
-1. Monitor chat for new user event
+- [x] 1. Monitor chat for new user event
+- [x] 2. Send message to new user
+- [ ] 3. Prepare pin message with buttons (should be created by bot)
+- [ ] 4. Monitor button click event from new user
+- [ ] 5. Ban user after period of time, remove all messages
