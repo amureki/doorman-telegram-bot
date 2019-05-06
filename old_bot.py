@@ -28,25 +28,11 @@ def new_member_action(bot, update):
             chat_id=msg.chat_id,
             user_id=user.id
         )
-
-        keyboard = [[
-            InlineKeyboardButton('Согласен(-на) с правилами', callback_data=f'accept__{user.id}'),
-            InlineKeyboardButton('Правила не по мне', callback_data=f'decline__{user.id}')
-        ]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
         bot_reply = bot.send_message(
             chat_id=msg.chat_id,
-            text=f'Welcome, {username}!',
-            reply_markup=reply_markup
-        )
-
+            text=f'Welcome, {username}!')
         sleep(60)
         bot.delete_message(chat_id=msg.chat_id, message_id=bot_reply.message_id)
-        bot.kick_chat_member(
-            chat_id=msg.chat_id,
-            user_id=user.id
-        )
 
     bot.delete_message(chat_id=msg.chat_id, message_id=msg.message_id)
 
@@ -71,25 +57,17 @@ def rules(bot, update):
 
 def rules_button(bot, update):
     query = update.callback_query
-    callback_data = query.data
+    from_user = query.from_user
 
-    new_user_id = int(callback_data.split('__')[1])
-
-    chat = update.effective_chat
-    user = update.effective_user
-
-    if user.id != new_user_id:
-        return
-
-    if callback_data.startswith('accept'):
-        bot.promote_chat_member(
-            chat_id=chat.id,
-            user_id=user.id
-        )
+    answer = query.data
+    if answer == 'accept':
+        # TODO:
+        pass
     else:
+        pass
         bot.kick_chat_member(
-            chat_id=chat.id,
-            user_id=user.id
+            chat_id=query.message.chat_id,
+            user_id=from_user.id
         )
 
 
@@ -108,9 +86,7 @@ def start_bot():
     dispatcher.add_handler(new_member_handler)
 
     dispatcher.add_handler(CommandHandler('rules', rules))
-    updater.dispatcher.add_handler(
-        CallbackQueryHandler(rules_button)
-    )
+    updater.dispatcher.add_handler(CallbackQueryHandler(rules_button))
 
     dispatcher.add_error_handler(error)
 
