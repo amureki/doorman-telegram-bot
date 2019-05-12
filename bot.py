@@ -1,5 +1,4 @@
 import os
-from time import sleep
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -14,15 +13,16 @@ from telegram.ext import (
 from utils import delete_message_if_exists, error_handler
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-SECONDS_BEFORE_KICK = 20
+SECONDS_BEFORE_KICK = os.environ.get("SECONDS_BEFORE_KICK", "60")
 
 
 @run_async
-def new_member_action(bot, update):
+def new_member_action(bot, update, job_queue):
     msg = update.message
     chat_id = msg.chat_id
     for user in msg.new_chat_members:
         username = user.name
+        # TODO: restrict only for 24 hours maybe?
         bot.restrict_chat_member(chat_id=chat_id, user_id=user.id)
         bot.delete_message(chat_id=chat_id, message_id=msg.message_id)
 
@@ -40,13 +40,33 @@ def new_member_action(bot, update):
             reply_markup=reply_markup,
         )
 
-        sleep(SECONDS_BEFORE_KICK)
-        user_info = bot.get_chat_member(chat_id=chat_id, user_id=user.id)
+        job_queue.run_once(
+            kick_if_no_reaction,
+            when=int(SECONDS_BEFORE_KICK),
+            context={
+                "chat_id": chat_id,
+                "user_id": user.id,
+                "bot_reply_id": bot_reply.message_id,
+            },
+        )
 
-        delete_message_if_exists(bot=bot, chat_id=chat_id, msg_id=bot_reply.message_id)
 
-        if user_info.can_send_messages is False:
-            bot.kick_chat_member(chat_id=msg.chat_id, user_id=user.id)
+def kick_if_no_reaction(bot, job):
+    chat_id = job.context["chat_id"]
+    user_id = job.context["user_id"]
+    bot_reply_id = job.context["bot_reply_id"]
+
+    user_info = bot.get_chat_member(chat_id=chat_id, user_id=user_id)
+    delete_message_if_exists(bot=bot, chat_id=chat_id, msg_id=bot_reply_id)
+    if user_info.can_send_messages is False:
+        bot.kick_chat_member(chat_id=chat_id, user_id=user_id)
+
+
+@run_async
+def left_chat_member_action(bot, update):
+    msg = update.message
+    chat_id = msg.chat_id
+    bot.delete_message(chat_id=chat_id, message_id=msg.message_id)
 
 
 def rules_command_handler(bot, update):
@@ -86,12 +106,16 @@ def start_bot():
     dispatcher = updater.dispatcher
 
     new_member_handler = MessageHandler(
-        Filters.status_update.new_chat_members, new_member_action
+        Filters.status_update.new_chat_members, new_member_action, pass_job_queue=True
     )
     dispatcher.add_handler(new_member_handler)
+    left_chat_member_handler = MessageHandler(
+        Filters.status_update.left_chat_member, left_chat_member_action
+    )
+    dispatcher.add_handler(left_chat_member_handler)
 
     dispatcher.add_handler(CommandHandler("rules", rules_command_handler))
-    updater.dispatcher.add_handler(CallbackQueryHandler(rules_button_handler))
+    dispatcher.add_handler(CallbackQueryHandler(rules_button_handler))
 
     dispatcher.add_error_handler(error_handler)
 
