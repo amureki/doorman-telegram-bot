@@ -1,7 +1,9 @@
+import logging
 import os
 
 import requests
 import sentry_sdk
+from sentry_sdk.integrations.logging import LoggingIntegration
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     CallbackQueryHandler,
@@ -14,8 +16,10 @@ from telegram.ext import (
 
 from utils import delete_message_if_exists, error_handler
 
+logger = logging.getLogger(__name__)
 sentry_sdk.init(
     dsn=os.environ.get("SENTRY_DSN"),
+    integrations=[LoggingIntegration(level=logging.INFO, event_level=logging.WARNING)],
     environment="doorman",
     server_name=os.environ.get("SERVER_NAME", "Undefined"),
 )
@@ -32,7 +36,11 @@ def new_member_action(bot, update, job_queue):
     chat_id = msg.chat_id
     for user in msg.new_chat_members:
         if ENABLE_DEBUG_SENTRY_LOGGING:
-            sentry_sdk.capture_message('Doorman is restricting "%s"' % user.name)
+            logger.warning(
+                'Doorman is restricting user in "%s"',
+                msg.chat.title,
+                extra={"username": user.name, "chat_id": msg.chat_id},
+            )
 
         # TODO: restrict only for 24 hours maybe?
         bot.restrict_chat_member(chat_id=chat_id, user_id=user.id)
@@ -57,6 +65,7 @@ def new_member_action(bot, update, job_queue):
             when=int(SECONDS_BEFORE_KICK),
             context={
                 "chat_id": chat_id,
+                "chat_title": msg.chat.title,
                 "user_id": user.id,
                 "bot_reply_id": bot_reply.message_id,
             },
@@ -65,6 +74,7 @@ def new_member_action(bot, update, job_queue):
 
 def kick_if_no_reaction(bot, job):
     chat_id = job.context["chat_id"]
+    chat_title = job.context["chat_title"]
     user_id = job.context["user_id"]
     bot_reply_id = job.context["bot_reply_id"]
 
@@ -72,8 +82,14 @@ def kick_if_no_reaction(bot, job):
     delete_message_if_exists(bot=bot, chat_id=chat_id, msg_id=bot_reply_id)
     if user_info.can_send_messages is False:
         if ENABLE_DEBUG_SENTRY_LOGGING:
-            sentry_sdk.capture_message(
-                'Doorman is kicking "%s" (ignored)' % user_info.user.name
+            logger.warning(
+                'Doorman is kicking user in "%s"',
+                chat_title,
+                extra={
+                    "username": user_info.user.name,
+                    "chat_id": chat_id,
+                    "reason": "ignored",
+                },
             )
         bot.kick_chat_member(chat_id=chat_id, user_id=user_id)
 
@@ -107,17 +123,26 @@ def rules_button_handler(bot, update):
     if callback_data.startswith("accept"):
         bot.promote_chat_member(chat_id=chat.id, user_id=user.id)
         if ENABLE_DEBUG_SENTRY_LOGGING:
-            sentry_sdk.capture_message('Doorman is promoting "%s"' % user.name)
+            logger.warning(
+                'Doorman is promoting user in "%s"',
+                chat.title,
+                extra={"username": user.name, "chat_id": chat.id},
+            )
     else:
         if ENABLE_DEBUG_SENTRY_LOGGING:
-            sentry_sdk.capture_message('Doorman is kicking "%s" (declined)' % user.name)
+            logger.warning(
+                'Doorman is kicking user in "%s"',
+                chat.title,
+                extra={"username": user.name, "chat_id": chat.id, "reason": "declined"},
+            )
         bot.kick_chat_member(chat_id=chat.id, user_id=user.id)
 
     bot.delete_message(chat_id=chat.id, message_id=bot_msg.message_id)
 
 
 def healthcheck_callback(bot, job):
-    requests.get("https://hc-ping.com/{}".format(HEALTHCHECK_TOKEN))
+    if HEALTHCHECK_TOKEN:
+        requests.get("https://hc-ping.com/{}".format(HEALTHCHECK_TOKEN))
 
 
 def start_bot():
