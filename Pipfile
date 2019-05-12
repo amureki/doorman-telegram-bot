@@ -5,6 +5,8 @@ name = "pypi"
 
 [packages]
 python-telegram-bot = "*"
+sentry-sdk = "*"
+requests = "*"
 
 [dev-packages]
 pre-commit = "*"
