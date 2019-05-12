@@ -7,6 +7,7 @@ Restart=always
 Type=simple
 WorkingDirectory=/root/dev/doorman-telegram-bot
 ExecStart=/bin/sh -c '/usr/local/bin/pipenv run python3 bot.py > /root/dev/doorman-telegram-bot/output.log 2>&1'
+KillMode=process
 
 [Install]
 WantedBy=multi-user.target
