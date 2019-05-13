@@ -26,6 +26,7 @@ sentry_sdk.init(
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 SECONDS_BEFORE_KICK = os.environ.get("SECONDS_BEFORE_KICK", "60")
+# TODO: fix boolean
 ENABLE_DEBUG_SENTRY_LOGGING = os.environ.get("ENABLE_DEBUG_SENTRY_LOGGING", False)
 HEALTHCHECK_TOKEN = os.environ.get("HEALTHCHECK_TOKEN")
 
@@ -48,8 +49,12 @@ def new_member_action(bot, update, job_queue):
 
         keyboard = [
             [
-                InlineKeyboardButton("Согласны", callback_data=f"accept__{user.id}"),
-                InlineKeyboardButton("Нет", callback_data=f"decline__{user.id}"),
+                InlineKeyboardButton(
+                    "Нeсогласен(-на)", callback_data=f"decline__{user.id}"
+                ),
+                InlineKeyboardButton(
+                    "Согласен(-на)", callback_data=f"accept__{user.id}"
+                ),
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
